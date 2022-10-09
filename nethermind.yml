@@ -42,6 +42,8 @@ services:
       - /var/lib/nethermind
       - --Init.WebSocketsEnabled
       - "true"
+      - --Network.ExternalIp
+      - ${LOCAL_MACHINE_IP:-127.0.0.1}  
       - --Network.DiscoveryPort
       - ${EL_P2P_PORT:-30303}
       - --Network.P2PPort
@@ -51,13 +53,19 @@ services:
       - --JsonRpc.Enabled
       - "true"
       - --JsonRpc.EnabledModules
-      - "Web3,Eth,Subscribe,Net"
+      - "Web3,Eth,Subscribe,Net,Admin"
       - --JsonRpc.Host
       - 0.0.0.0
       - --JsonRpc.Port
       - ${EL_RPC_PORT:-8545}
       - --JsonRpc.WebSocketsPort
       - ${EL_WS_PORT:-8546}
+      - --JsonRpc.EngineEnabledModules
+      - "Web3,Eth,Subscribe,Net"
+      - --JsonRpc.EngineHost
+      - 0.0.0.0
+      - --JsonRpc.EnginePort
+      - ${EE_PORT:-8551}   
       - --JsonRpc.AdditionalRpcUrls=http://0.0.0.0:${EE_PORT:-8551}|http;ws|engine;eth;subscribe
       - --JsonRpc.JwtSecretFile=/var/lib/nethermind/ee-secret/jwtsecret
       - --Sync.SnapSync
@@ -67,14 +75,19 @@ services:
       - --Metrics.ExposePort
       - "6060"
       - --Metrics.IntervalSeconds
-      - "999999"
+      - "15"
+      - --Metrics.PushGatewayUrl
+      - ${PUSHGATEWAY_URL}
       - --config
       - ${NETWORK}
-# Potentially unsafe to auto-prune
-#      - --Pruning.FullPruningMaxDegreeOfParallelism
-#      - "2"
-#      - --Pruning.FullPruningTrigger
-#      - "VolumeFreeSpace"
+      - --HealthChecks.Enabled
+      - "true"  
+      - --Pruning.CacheMb
+      - "4096"
+      - --Pruning.FullPruningMaxDegreeOfParallelism
+      - "4"
+      - --Pruning.FullPruningCompletionBehavior
+      - 'AlwaysShutdown'  
       - --Sync.AncientBodiesBarrier
       - "1"
       - --Sync.AncientReceiptsBarrier

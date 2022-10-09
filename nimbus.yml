@@ -66,6 +66,7 @@ services:
       - --keymanager-allow-origin=*
       - --keymanager-token-file=/var/lib/nimbus/api-token.txt
       - --suggested-fee-recipient=${FEE_RECIPIENT}
+      - --nat=extip:${LOCAL_MACHINE_IP:-127.0.0.1}  
     command: ${CL_EXTRAS}
 
   validator-import:

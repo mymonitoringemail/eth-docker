@@ -1,0 +1,5 @@
+version: "3.4"
+services:
+  consensus:
+    ports:
+      - 127.0.0.1:${CL_REST_PORT:-5052}:${CL_REST_PORT:-5052}/tcp

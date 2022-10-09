@@ -4,3 +4,9 @@
     static_configs:
     - targets:
       - execution:6060
+  - job_name: pushgateway
+    metrics_path: /metrics
+    scheme: http
+    honor_labels: true
+    static_configs:
+    - targets: ["pushgateway:9091"]

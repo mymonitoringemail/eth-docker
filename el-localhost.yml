@@ -1,0 +1,5 @@
+version: "3.4"
+services:
+  execution:
+    ports:
+      - 127.0.0.1:${EL_RPC_PORT:-8545}:${EL_RPC_PORT:-8545}/tcp

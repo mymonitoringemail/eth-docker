@@ -1,0 +1,29 @@
+version: "3.4"
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 100m
+      max-file: "3"
+      tag: '{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}'
+
+services:
+  sshtunnel-cl-s2:
+    restart: "unless-stopped"
+    build:
+      context: ./sshtunnel
+      dockerfile: ${SSH_TUNNEL_DOCKERFILE}
+    image: sshtunnel
+    environment:
+      - REMOTE_HOST_ADDRESS=${SSH_TUNNEL_CL1_HOST_ADDRESS}
+      - REMOTE_HOST_PORT=${SSH_TUNNEL_CL1_HOST_PORT}
+      - SSH_PORT=${SSH_TUNNEL_CL1_SSH_PORT}
+      - SSH_USER=${SSH_TUNNEL_CL1_SSH_USER}
+      - LOCAL_PORT=${SSH_TUNNEL_CL1_LOCAL_PORT}
+    volumes:
+      - ${SSH_TUNNEL_CL1_SSH_KEY}:/var/keys/remote_key
+      - ${SSH_TUNNEL_CL1_KNOWN_HOSTS_FILE}:/var/hosts/known_hosts
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 127.0.0.1:5051:${SSH_TUNNEL_CL1_LOCAL_PORT}/tcp
+    <<: *logging

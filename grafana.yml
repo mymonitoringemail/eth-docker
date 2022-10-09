@@ -131,6 +131,15 @@ services:
     restart: "unless-stopped"
     <<: *logging
 
+  pushgateway:
+    restart: "unless-stopped"
+    image: prom/pushgateway:latest
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    command:
+      - --web.listen-address=:${PUSHGATEWAY_PORT:-9091}
+    <<: *logging
+
   grafana:
     restart: "unless-stopped"
     build:
