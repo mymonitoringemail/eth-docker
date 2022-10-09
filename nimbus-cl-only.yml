@@ -68,6 +68,7 @@ services:
       - --suggested-fee-recipient=${FEE_RECIPIENT}
       - --subscribe-all-subnets
       - --in-process-validators=false
+      - --nat=extip:${LOCAL_MACHINE_IP:-127.0.0.1}  
     command: ${CL_EXTRAS}
     labels:
       - traefik.enable=true
