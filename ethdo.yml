@@ -4,11 +4,15 @@ services:
   ethdo:
     profiles: ["tools"]
     restart: "no"
-    image: wealdtech/ethdo:latest
+    build:
+      context: ./ethdo
+    image: ethdo:local
+    volumes:
+      - ./.eth:/app/.eth
+    environment:
+      - NETWORK=${NETWORK}
+      - CL_NODE=${CL_NODE:-http://consensus:5052}
     entrypoint:
+      - docker-entrypoint.sh
       - /app/ethdo
-      -  --connection
-      - http://consensus:5052
       - --allow-insecure-connections
-    depends_on:
-      - consensus

@@ -1,0 +1,76 @@
+name: Test Prysm and Geth
+run-name: Test Prysm and Geth
+
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+
+jobs:
+  test-lighthouse-geth:
+    if: |
+      github.event.issue.pull_request && (
+      contains(github.event.comment.body, '/test-prysm')||
+      contains(github.event.comment.body, '/test-geth')||
+      contains(github.event.comment.body, '/test-all') )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR details
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+      - name: Set commit status as pending
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
+          context: Test Prysm and Geth
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+      - name: Create .env file
+        run: |
+          cp default.env .env
+      - name: Set Prysm/Geth
+        run: |
+          source ./.github/helper.sh
+          COMPOSE_FILE=prysm.yml:geth.yml
+          var=COMPOSE_FILE
+          set_value_in_env
+      - name: Start Prysm/Geth
+        run: |
+          ./ethd up
+      - name: Test Prysm CL
+        run: |
+          ./.github/check-service.sh consensus
+      - name: Test Prysm VC
+        run: |
+          ./.github/check-service.sh validator
+      - name: Test Geth
+        run: |
+          ./.github/check-service.sh execution
+      - name: Set Prysm/Geth w/ VC
+        run: |
+          source ./.github/helper.sh
+          COMPOSE_FILE=prysm-cl-only.yml:prysm-vc-only.yml:geth.yml
+          var=COMPOSE_FILE
+          set_value_in_env
+      - name: Start Prysm/Geth
+        run: |
+          ./ethd up
+      - name: Test Prysm CL
+        run: |
+          ./.github/check-service.sh consensus
+      - name: Test Prysm VC
+        run: |
+          ./.github/check-service.sh validator
+      - name: Test Geth
+        run: |
+          ./.github/check-service.sh execution
+      - name: Set final commit status
+        uses: myrotvorets/set-commit-status-action@master
+        if: always()
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
+          context: Test Prysm and Geth

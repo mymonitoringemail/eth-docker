@@ -21,14 +21,19 @@ services:
     user: erigon
     environment:
       - JWT_SECRET=${JWT_SECRET}
-      - LOG_LEVEL=${LOG_LEVEL}
+      - EL_EXTRAS=${EL_EXTRAS:-}
+      - ARCHIVE_NODE=${ARCHIVE_NODE:-}
     volumes:
       - erigon-el-data:/var/lib/erigon
       - /etc/localtime:/etc/localtime:ro
       - jwtsecret:/var/lib/erigon/ee-secret
     ports:
-      - ${HOST_IP:-0.0.0.0}:${EL_P2P_PORT-30303}:${EL_P2P_PORT:-30303}/tcp
-      - ${HOST_IP:-0.0.0.0}:${EL_P2P_PORT-30303}:${EL_P2P_PORT:-30303}/udp
+      - ${HOST_IP:-0.0.0.0}:${EL_P2P_PORT:-30303}:${EL_P2P_PORT:-30303}/tcp
+      - ${HOST_IP:-0.0.0.0}:${EL_P2P_PORT:-30303}:${EL_P2P_PORT:-30303}/udp
+      - ${HOST_IP:-0.0.0.0}:${ERIGON_P2P_PORT_2:-30304}:${ERIGON_P2P_PORT_2:-30304}/tcp
+      - ${HOST_IP:-0.0.0.0}:${ERIGON_P2P_PORT_2:-30304}:${ERIGON_P2P_PORT_2:-30304}/udp
+      - ${HOST_IP:-0.0.0.0}:${ERIGON_P2P_PORT_3:-30305}:${ERIGON_P2P_PORT_3:-30305}/tcp
+      - ${HOST_IP:-0.0.0.0}:${ERIGON_P2P_PORT_3:-30305}:${ERIGON_P2P_PORT_3:-30305}/udp
       # torrent ports
       - ${HOST_IP:-0.0.0.0}:${ERIGON_TORRENT_PORT:-42069}:${ERIGON_TORRENT_PORT:-42069}/tcp
       - ${HOST_IP:-0.0.0.0}:${ERIGON_TORRENT_PORT:-42069}:${ERIGON_TORRENT_PORT:-42069}/udp
@@ -46,17 +51,19 @@ services:
       - /var/lib/erigon
       - --port
       - ${EL_P2P_PORT:-30303}
+      - --p2p.allowed-ports
+      - ${EL_P2P_PORT:-30303},${ERIGON_P2P_PORT_2:-30304},${ERIGON_P2P_PORT_3:-30305}
       - --torrent.port
       - ${ERIGON_TORRENT_PORT:-42069}
       - --nat
       - any
       - --chain
       - ${NETWORK}
-      - --prune=htc
+      - --log.console.verbosity
+      - ${LOG_LEVEL}
       - --metrics
       - --metrics.addr
       - 0.0.0.0
-      - --metrics.expensive
       - --http
       - --http.addr
       - 0.0.0.0
@@ -67,6 +74,9 @@ services:
       - --http.api
       - web3,eth,net,engine
       - --ws
+      # Allow RocketPool >=1.9 watchtower queries
+      - --rpc.returndata.limit
+      - "1000000"
       - --authrpc.addr
       - 0.0.0.0
       - --authrpc.port
@@ -74,12 +84,15 @@ services:
       - --authrpc.vhosts=*
       - --authrpc.jwtsecret
       - /var/lib/erigon/ee-secret/jwtsecret
+      - --externalcl
       - --maxpeers
       - ${EL_MAX_PEER_COUNT:-100}
-      # Reduce memory use so it fits into 16 GiB machines
-      - --batchSize
-      - 64m
-    command: ${EL_EXTRAS}
+      # To assist with recordsize 16k in ZFS
+      - --db.pagesize
+      - 16K
+      # Memory use reduction. Not needed with 32G and does not help with 16G
+      #- --batchSize
+      #- 64m
 volumes:
   erigon-el-data:
   jwtsecret:

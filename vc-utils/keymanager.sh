@@ -2,12 +2,23 @@
 
 call_api() {
     set +e
-    if [ -z "${TLS:+x}" ]; then
-        __code=$(curl -m 30 -s --show-error -o /tmp/result.txt -w "%{http_code}" -X ${__http_method} -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $__token" \
-            --data "${__api_data}" http://${__api_container}:${KEY_API_PORT:-7500}/${__api_path})
+    if [ -z "${__api_data}" ]; then
+        if [ -z "${TLS:+x}" ]; then
+            __code=$(curl -m 60 -s --show-error -o /tmp/result.txt -w "%{http_code}" -X "${__http_method}" -H "Accept: application/json" -H "Authorization: Bearer $__token" \
+                http://"${__api_container}":"${KEY_API_PORT:-7500}"/"${__api_path}")
+        else
+            __code=$(curl -k -m 60 -s --show-error -o /tmp/result.txt -w "%{http_code}" -X "${__http_method}" -H "Accept: application/json" -H "Authorization: Bearer $__token" \
+                https://"${__api_container}":"${KEY_API_PORT:-7500}"/"${__api_path}")
+
+        fi
     else
-        __code=$(curl -k -m 30 -s --show-error -o /tmp/result.txt -w "%{http_code}" -X ${__http_method} -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $__token" \
-            --data "${__api_data}" https://${__api_container}:${KEY_API_PORT:-7500}/${__api_path})
+        if [ -z "${TLS:+x}" ]; then
+            __code=$(curl -m 60 -s --show-error -o /tmp/result.txt -w "%{http_code}" -X "${__http_method}" -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $__token" \
+                --data "${__api_data}" http://"${__api_container}":"${KEY_API_PORT:-7500}"/"${__api_path}")
+        else
+            __code=$(curl -k -m 60 -s --show-error -o /tmp/result.txt -w "%{http_code}" -X "${__http_method}" -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $__token" \
+                --data "${__api_data}" https://"${__api_container}":"${KEY_API_PORT:-7500}"/"${__api_path}")
+        fi
     fi
     __return=$?
     if [ $__return -ne 0 ]; then
@@ -28,9 +39,9 @@ call_api() {
 get-token() {
 set +e
     if [ -z "${PRYSM:+x}" ]; then
-        __token=$(cat $__token_file)
+        __token=$(< "${__token_file}")
     else
-        __token=$(sed -n 2p $__token_file)
+        __token=$(sed -n 2p "${__token_file}")
     fi
     __return=$?
     if [ $__return -ne 0 ]; then
@@ -43,7 +54,7 @@ set -e
 
 print-api-token() {
     get-token
-    echo $__token
+    echo "${__token}"
 }
 
 get-prysm-wallet() {
@@ -66,12 +77,12 @@ recipient-get() {
     __http_method=GET
     call_api
     case $__code in
-        200) echo "The fee recipient for the validator with public key $__pubkey is:"; echo $__result | jq -r '.data.ethaddress'; exit 0;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "The authorization token is invalid. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        404) echo "Path not found error. Was that the right pubkey? Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        200) echo "The fee recipient for the validator with public key $__pubkey is:"; echo "$__result" | jq -r '.data.ethaddress'; exit 0;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "The authorization token is invalid. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        404) echo "Path not found error. Was that the right pubkey? Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
 }
 
@@ -91,12 +102,12 @@ recipient-set() {
     call_api
     case $__code in
         202) echo "The fee recipient for the validator with public key $__pubkey was updated."; exit 0;;
-        400) echo "The pubkey or address was formatted wrong. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "The authorization token is invalid. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        404) echo "Path not found error. Was that the right pubkey? Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        400) echo "The pubkey or address was formatted wrong. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "The authorization token is invalid. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        404) echo "Path not found error. Was that the right pubkey? Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
 }
 
@@ -112,11 +123,11 @@ recipient-delete() {
     call_api
     case $__code in
         204) echo "The fee recipient for the validator with public key $__pubkey was set back to default."; exit 0;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "A fee recipient was found, but cannot be deleted. It may be in a configuration file. Message: $(echo $__result | jq -r '.message')"; exit 0;;
-        404) echo "The key was not found on the server, nothing to delete. Message: $(echo $__result | jq -r '.message')"; exit 0;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "A fee recipient was found, but cannot be deleted. It may be in a configuration file. Message: $(echo "$__result" | jq -r '.message')"; exit 0;;
+        404) echo "The key was not found on the server, nothing to delete. Message: $(echo "$__result" | jq -r '.message')"; exit 0;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
 }
 
@@ -131,13 +142,13 @@ gas-get() {
     __http_method=GET
     call_api
     case $__code in
-        200) echo "The execution gas limit for the validator with public key $__pubkey is:"; echo $__result | jq -r '.data.gas_limit'; exit 0;;
-        400) echo "The pubkey was formatted wrong. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "The authorization token is invalid. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        404) echo "Path not found error. Was that the right pubkey? Error: $(echo $__result | jq -r '.message')"; exit 0;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        200) echo "The execution gas limit for the validator with public key $__pubkey is:"; echo "$__result" | jq -r '.data.gas_limit'; exit 0;;
+        400) echo "The pubkey was formatted wrong. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "The authorization token is invalid. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        404) echo "Path not found error. Was that the right pubkey? Error: $(echo "$__result" | jq -r '.message')"; exit 0;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
 }
 
@@ -157,12 +168,12 @@ gas-set() {
     call_api
     case $__code in
         202) echo "The gas limit for the validator with public key $__pubkey was updated."; exit 0;;
-        400) echo "The pubkey or limit was formatted wrong. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "The authorization token is invalid. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        404) echo "Path not found error. Was that the right pubkey? Error: $(echo $__result | jq -r '.message')"; exit 0;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        400) echo "The pubkey or limit was formatted wrong. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "The authorization token is invalid. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        404) echo "Path not found error. Was that the right pubkey? Error: $(echo "$__result" | jq -r '.message')"; exit 0;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
 }
 
@@ -178,16 +189,16 @@ gas-delete() {
     call_api
     case $__code in
         204) echo "The gas limit for the validator with public key $__pubkey was set back to default."; exit 0;;
-        400) echo "The pubkey was formatted wrong. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "A gas limit was found, but cannot be deleted. It may be in a configuration file. Message: $(echo $__result | jq -r '.message')"; exit 0;;
-        404) echo "The key was not found on the server, nothing to delete. Message: $(echo $__result | jq -r '.message')"; exit 0;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        400) echo "The pubkey was formatted wrong. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "A gas limit was found, but cannot be deleted. It may be in a configuration file. Message: $(echo "$__result" | jq -r '.message')"; exit 0;;
+        404) echo "The key was not found on the server, nothing to delete. Message: $(echo "$__result" | jq -r '.message')"; exit 0;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
 }
 
-validator-list() {
+__validator-list-call() {
     get-token
     __api_path=eth/v1/keystores
     __api_data=""
@@ -195,73 +206,101 @@ validator-list() {
     call_api
     case $__code in
         200);;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "The authorization token is invalid. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "The authorization token is invalid. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
-    if [ $(echo $__result | jq '.data | length') -eq 0 ]; then
+}
+
+validator-list() {
+    __validator-list-call
+    if [ "$(echo "$__result" | jq '.data | length')" -eq 0 ]; then
         echo "No keys loaded"
     else
         echo "Validator public keys"
-        echo $__result | jq -r '.data[].validating_pubkey'
+        echo "$__result" | jq -r '.data[].validating_pubkey'
     fi
 }
 
 validator-delete() {
-    if [ -z "$__pubkey" ]; then
-      echo "Please specify a validator public key to delete"
+    if [ -z "${__pubkey}" ]; then
+      echo "Please specify a validator public key to delete, or \"all\""
       exit 0
     fi
+    __pubkeys=()
+    if [ "${__pubkey}" = "all" ]; then
+        echo "WARNING - this will delete all currently loaded keys from the validator client."
+        echo
+        read -rp "Do you wish to continue with key deletion? (No/yes) " yn
+        case $yn in
+            [Yy][Ee][Ss]) ;;
+            * ) echo "Aborting key deletion"; exit 0;;
+        esac
+
+        __validator-list-call
+        if [ "$(echo "$__result" | jq '.data | length')" -eq 0 ]; then
+            echo "No keys loaded, cannot delete anything"
+            return
+        else
+            __keys_to_array=$(echo "$__result" | jq -r '.data[].validating_pubkey' | tr '\n' ' ')
+# Word splitting is desired for the array
+# shellcheck disable=SC2206
+            __pubkeys+=( ${__keys_to_array} )
+        fi
+    else
+        __pubkeys+=( "${__pubkey}" )
+    fi
+
     get-token
     __api_path=eth/v1/keystores
-    __api_data="{\"pubkeys\":[\"$__pubkey\"]}"
-    __http_method=DELETE
-    call_api
-    case $__code in
-        200) ;;
-        400) echo "The pubkey was formatted wrong. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "The authorization token is invalid. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
-    esac
+    for __pubkey in "${__pubkeys[@]}"; do
+        __api_data="{\"pubkeys\":[\"$__pubkey\"]}"
+        __http_method=DELETE
+        call_api
+        case $__code in
+            200) ;;
+            400) echo "The pubkey was formatted wrong. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+            401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+            403) echo "The authorization token is invalid. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+            500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+            *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
+        esac
 
-    __status=$(echo $__result | jq -r '.data[].status')
-    case ${__status,,} in
-        error)
-            echo "The key was found but an error was encountered trying to delete it:"
-            echo $__result | jq -r '.data[].message'
-            ;;
-        not_active)
-            __file=validator_keys/slashing_protection-${__pubkey::10}--${__pubkey:90}.json
-            echo "Validator is not actively loaded."
-            echo $__result | jq '.slashing_protection | fromjson' > /$__file
-            chown 1000:1000 /$__file
-            chmod 644 /$__file
-            echo "Slashing protection data written to .eth/$__file"
-            ;;
-        deleted)
-            __file=validator_keys/slashing_protection-${__pubkey::10}--${__pubkey:90}.json
-            echo "Validator deleted."
-            echo $__result | jq '.slashing_protection | fromjson' > /$__file
-            chown 1000:1000 /$__file
-            chmod 644 /$__file
-            echo "Slashing protection data written to .eth/$__file"
-            ;;
-        not_found)
-            echo "The key was not found in the keystore, no slashing protection data returned."
-            ;;
-        * )
-            echo "Unexpected status $__status. This may be a bug"
-            exit 1
-            ;;
-    esac
+        __status=$(echo "$__result" | jq -r '.data[].status')
+        case ${__status,,} in
+            error)
+                echo "Validator ${__pubkey} was found but an error was encountered trying to delete it:"
+                echo "$__result" | jq -r '.data[].message'
+                ;;
+            not_active)
+                __file=validator_keys/slashing_protection-${__pubkey::10}--${__pubkey:90}.json
+                echo "Validator ${__pubkey} is not actively loaded."
+                echo "$__result" | jq '.slashing_protection | fromjson' > /"$__file"
+                chmod 644 /"$__file"
+                echo "Slashing protection data written to .eth/$__file"
+                ;;
+            deleted)
+                __file=validator_keys/slashing_protection-${__pubkey::10}--${__pubkey:90}.json
+                echo "Validator ${__pubkey} deleted."
+                echo "$__result" | jq '.slashing_protection | fromjson' > /"$__file"
+                chmod 644 /"$__file"
+                echo "Slashing protection data written to .eth/$__file"
+                ;;
+            not_found)
+                echo "The validator ${__pubkey} was not found in the keystore, no slashing protection data returned."
+                ;;
+            * )
+                echo "Unexpected status $__status. This may be a bug"
+                exit 1
+                ;;
+        esac
+    done
 }
 
 validator-import() {
-    __num_files=$(ls -a1 /validator_keys/ | grep '^keystore.*json$' | wc -l)
-    if [ $__num_files -eq 0 ]; then
+    __num_files=$(find /validator_keys -maxdepth 1 -type f -name 'keystore*.json' | wc -l)
+    if [ "$__num_files" -eq 0 ]; then
         echo "No keystore*.json files found in .eth/validator_keys/"
         echo "Nothing to do"
         exit 0
@@ -282,14 +321,14 @@ validator-import() {
         echo "you are at risk of getting slashed. Exercise caution"
         echo
         while true; do
-            read -rp "I understand these dire warnings and wish to proceed with key import (No/Yes) " yn
+            read -rp "I understand these dire warnings and wish to proceed with key import (No/yes) " yn
             case $yn in
-                [Yy]es) break;;
+                [Yy][Ee][Ss]) break;;
                 [Nn]* ) echo "Aborting import"; exit 0;;
                 * ) echo "Please answer yes or no.";;
             esac
         done
-        if [ $__num_files -gt 1 ]; then
+        if [ "$__num_files" -gt 1 ]; then
             while true; do
                 read -rp "Do all validator keys have the same password? (y/n) " yn
                 case $yn in
@@ -322,7 +361,7 @@ validator-import() {
     __errored=0
     for __keyfile in /validator_keys/keystore*.json; do
         [ -f "$__keyfile" ] || continue
-        __pubkey=0x$(cat $__keyfile | jq -r '.pubkey')
+        __pubkey=0x$(jq -r '.pubkey' < "$__keyfile")
         if [ $__justone -eq 0 ]; then
             while true; do
                 read -srp "Please enter the password for your validator key stored in $__keyfile with public key $__pubkey: " __password
@@ -339,33 +378,35 @@ validator-import() {
             done
         fi
         __do_a_protec=0
+        __found_one=0
         for __protectfile in /validator_keys/slashing_protection*.json; do
             [ -f "$__protectfile" ] || continue
-            if cat $__protectfile | grep -q "$__pubkey"; then
+            if grep -q "$__pubkey" "$__protectfile"; then
+                __found_one=1
                 echo "Found slashing protection import file $__protectfile for $__pubkey"
-                if [ $(cat $__protectfile | jq ".data[] | select(.pubkey==\"$__pubkey\") | .signed_blocks | length") -gt 0 \
-                    -o $(cat $__protectfile | jq ".data[] | select(.pubkey==\"$__pubkey\") | .signed_attestations | length") -gt 0 ]; then
+                if [ "$(jq ".data[] | select(.pubkey==\"$__pubkey\") | .signed_blocks | length" < "$__protectfile")" -gt 0 ] \
+                    || [ "$(jq ".data[] | select(.pubkey==\"$__pubkey\") | .signed_attestations | length" < "$__protectfile")" -gt 0 ]; then
                     __do_a_protec=1
                     echo "It will be imported"
                 else
                     echo "WARNING: The file does not contain importable data and will be skipped."
                     echo "Your validator will be imported WITHOUT slashing protection data."
-                    echo
                 fi
                 break
             fi
         done
-        if [ "$__do_a_protec" -eq 0 ]; then
-                echo "No viable slashing protection import file found for $__pubkey"
-                echo "Proceeding without slashing protection."
+        if [ "${__found_one}" -eq 0 ]; then
+                echo "No viable slashing protection import file found for $__pubkey."
+                echo "This is expected if this is a new key."
+                echo "Proceeding without slashing protection import."
         fi
-        __keystore_json=$(cat $__keyfile)
+        __keystore_json=$(< "$__keyfile")
         if [ "$__do_a_protec" -eq 1 ]; then
-            __protect_json=$(cat $__protectfile | jq "select(.data[].pubkey==\"$__pubkey\") | tojson")
+            __protect_json=$(jq "select(.data[].pubkey==\"$__pubkey\") | tojson" < "$__protectfile")
         else
             __protect_json=""
         fi
-        echo $__protect_json > /tmp/protect.json
+        echo "$__protect_json" > /tmp/protect.json
         if [ "$__do_a_protec" -eq 0 ]; then
             jq --arg keystore_value "$__keystore_json" --arg password_value "$__password" '. | .keystores += [$keystore_value] | .passwords += [$password_value]' <<< '{}' >/tmp/apidata.txt
         else
@@ -377,34 +418,34 @@ validator-import() {
         call_api
     case $__code in
         200) ;;
-        400) echo "The pubkey was formatted wrong. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        401) echo "No authorization token found. This is a bug. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        403) echo "The authorization token is invalid. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        500) echo "Internal server error. Error: $(echo $__result | jq -r '.message')"; exit 1;;
-        *) echo "Unexpected return code. Result: $(echo $__result)"; exit 1;;
+        400) echo "The pubkey was formatted wrong. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        401) echo "No authorization token found. This is a bug. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        403) echo "The authorization token is invalid. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        500) echo "Internal server error. Error: $(echo "$__result" | jq -r '.message')"; exit 1;;
+        *) echo "Unexpected return code $__code. Result: $__result"; exit 1;;
     esac
-        if ! echo $__result | grep -q "data"; then
+        if ! echo "$__result" | grep -q "data"; then
            echo "The key manager API query failed. Output:"
-           echo $__result
+           echo "$__result"
            exit 1
         fi
-        __status=$(echo $__result | jq -r '.data[].status')
+        __status=$(echo "$__result" | jq -r '.data[].status')
         case ${__status,,} in
             error)
                 echo "An error was encountered trying to import the key:"
-                echo $__result | jq -r '.data[].message'
+                echo "$__result" | jq -r '.data[].message'
                 echo
-                let "__errored+=1"
+                (( __errored+=1 ))
                 ;;
             imported)
                 echo "Validator key was successfully imported: $__pubkey"
                 echo
-                let "__imported+=1"
+                (( __imported+=1 ))
                 ;;
             duplicate)
                 echo "Validator key is a duplicate and was skipped: $__pubkey"
                 echo
-                let "__skipped+=1"
+                (( __skipped+=1 ))
                 ;;
             * )
                 echo "Unexpected status $__status. This may be a bug"
@@ -430,9 +471,9 @@ usage() {
     echo "  import"
     echo "      Import all keystore*.json in .eth/validator_keys while loading slashing protection data"
     echo "      in slashing_protection*.json files that match the public key(s) of the imported validator(s)"
-    echo "  delete 0xPUBKEY"
+    echo "  delete 0xPUBKEY | all"
     echo "      Deletes the validator with public key 0xPUBKEY from the validator client, and exports its"
-    echo "      slashing protection database"
+    echo "      slashing protection database. \"all\" deletes all detected validators instead"
     echo
     echo "  get-recipient 0xPUBKEY"
     echo "      List fee recipient set for the validator with public key 0xPUBKEY"
@@ -454,13 +495,56 @@ usage() {
     echo "      Print the token for the keymanager API running on port ${KEY_API_PORT:-7500}."
     echo "      This is also the token for the Prysm Web UI"
     echo
-    echo " get-prysm-wallet"
+    echo "  create-prysm-wallet"
+    echo "      Create a new Prysm wallet to store keys in"
+    echo "  get-prysm-wallet"
     echo "      Print Prysm's wallet password"
+    echo
+    echo "  prepare-address-change"
+    echo "      Create an offline-preparation.json with ethdo"
+    echo "  send-address-change"
+    echo "      Send a change-operations.json with ethdo, setting the withdrawal address"
 }
 
 set -e
 
-__token_file=$1
+if [ "$(id -u)" = '0' ]; then
+    __token_file=$1
+    __api_container=$2
+    case "$3" in
+        get-api-token)
+            print-api-token
+            exit 0
+            ;;
+        create-prysm-wallet)
+            echo "There's a bug in ethd; this command should have been handled one level higher. Please report this."
+            exit 1
+            ;;
+        get-prysm-wallet)
+            get-prysm-wallet
+            exit 0
+            ;;
+    esac
+    if [ -z "$3" ]; then
+        usage
+        exit 0
+    fi
+    if [ -f "$__token_file" ]; then
+        cp "$__token_file" /tmp/api-token.txt
+        chown "${OWNER_UID:-1000}":"${OWNER_UID:-1000}" /tmp/api-token.txt
+        exec gosu "${OWNER_UID:-1000}":"${OWNER_UID:-1000}" "${BASH_SOURCE[0]}" "$@"
+    elif  [ "$__token_file" = "NIL" ]; then # web3signer doesn't use a token
+        echo "NIL" >/tmp/api-token.txt
+        chown "${OWNER_UID:-1000}":"${OWNER_UID:-1000}" /tmp/api-token.txt
+        exec gosu "${OWNER_UID:-1000}":"${OWNER_UID:-1000}" "${BASH_SOURCE[0]}" "$@"
+    else
+        echo "File $__token_file not found."
+        echo "The $__api_container service may not be fully started yet."
+        exit 1
+    fi
+fi
+
+__token_file=/tmp/api-token.txt
 __api_container=$2
 
 case "$3" in
@@ -501,11 +585,11 @@ case "$3" in
         __pubkey=$4
         gas-delete
         ;;
-    get-api-token)
-        print-api-token
+    prepare-address-change)
+        echo "This should have been handled one layer up in ethd. This is a bug, please report."
         ;;
-    get-prysm-wallet)
-        get-prysm-wallet
+    send-address-change)
+        echo "This should have been handled one layer up in ethd. This is a bug, please report."
         ;;
     *)
         usage

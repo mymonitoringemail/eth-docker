@@ -23,6 +23,9 @@ services:
       - BEACON_STATS_API=${BEACON_STATS_API}
       - BEACON_STATS_MACHINE=${BEACON_STATS_MACHINE}
       - DOPPELGANGER=${DOPPELGANGER}
+      - VC_EXTRAS=${VC_EXTRAS:-}
+      - GRAFFITI=${GRAFFITI:-}
+      - DEFAULT_GRAFFITI=${DEFAULT_GRAFFITI:-false}
     volumes:
       - lhvalidator-data:/var/lib/lighthouse
       - /etc/localtime:/etc/localtime:ro
@@ -35,8 +38,6 @@ services:
       - /var/lib/lighthouse
       - --beacon-nodes
       - ${CL_NODE:-http://consensus:5052}
-      - --graffiti
-      - ${GRAFFITI}
       - --network
       - ${NETWORK}
       - --debug-level=${LOG_LEVEL}
@@ -54,33 +55,6 @@ services:
       - --unencrypted-http-transport
       - --suggested-fee-recipient
       - ${FEE_RECIPIENT}
-    command: ${VC_EXTRAS}
-
-  validator-import:
-    profiles: ["tools"]
-    restart: "no"
-    image: lighthouse:local
-    user: root
-    volumes:
-      - lhvalidator-data:/var/lib/lighthouse
-      - ./.eth/validator_keys:/validator_keys
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      - KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD:-}
-      - NETWORK=${NETWORK}
-    entrypoint:
-      - validator-import.sh
-      - lighthouse
-      - account
-      - validator
-      - import
-      - --datadir
-      - /var/lib/lighthouse
-      - --directory
-      - /val_keys
-      - --network
-      - ${NETWORK}
-      - --debug-level=${LOG_LEVEL}
 
   validator-exit:
     profiles: ["tools"]
